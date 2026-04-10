@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { EmitFn, Finding, Source } from '../types';
+import { EmitFn, Finding, Source, TraceEntry } from '../types';
 
 const client = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY,
@@ -25,13 +25,10 @@ export async function synthesizeReport(
 
   const sourcesText = uniqueSources.map((s, i) => `[${i + 1}] ${s.title} — ${s.url}`).join('\n');
 
-  const response = await client.chat.completions.create({
-    model: 'deepseek-chat',
-    max_tokens: 4096,
-    messages: [
-      {
-        role: 'user',
-        content: `You are a research analyst. Based on the research findings below, write a comprehensive, well-structured report that directly answers the original question.
+  const synthMessages: OpenAI.ChatCompletionMessageParam[] = [
+    {
+      role: 'user',
+      content: `You are a research analyst. Based on the research findings below, write a comprehensive, well-structured report that directly answers the original question.
 
 Original question: "${originalQuery}"
 
@@ -48,11 +45,31 @@ Write a professional markdown report with:
 4. **Conclusion**
 
 Be thorough, well-organized, and cite sources inline where relevant.`,
-      },
-    ],
+    },
+  ];
+
+  const start = Date.now();
+  const response = await client.chat.completions.create({
+    model: 'deepseek-chat',
+    max_tokens: 4096,
+    messages: synthMessages,
   });
+  const latencyMs = Date.now() - start;
 
   const report = response.choices[0].message.content ?? '';
+
+  emit('trace', {
+    phase: 'synthesizing',
+    label: 'Synthesizer',
+    messages: synthMessages.map((m) => ({
+      role: m.role,
+      content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+    })),
+    response: report,
+    inputTokens: response.usage?.prompt_tokens ?? 0,
+    outputTokens: response.usage?.completion_tokens ?? 0,
+    latencyMs,
+  } as TraceEntry);
 
   return { report, sources: uniqueSources };
 }

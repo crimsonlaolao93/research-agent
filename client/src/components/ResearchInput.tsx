@@ -9,10 +9,25 @@ const EXAMPLE_QUERIES = [
   "What are the latest advances in quantum computing?",
   "How does CRISPR gene editing work and what are its applications?",
   "What is the current state of large language models?",
+  "What are the most promising approaches to carbon capture technology?",
+  "How do transformer neural networks work?",
+  "What is the economic impact of automation on the labor market?",
+  "How does mRNA vaccine technology work?",
+  "What are the key differences between AGI and current AI systems?",
+  "What is the state of nuclear fusion energy research?",
+  "How does the global supply chain for semiconductors work?",
+  "What are the long-term effects of social media on mental health?",
+  "How does zero-knowledge proof cryptography work?",
 ];
+
+function pickRandom<T>(arr: T[], n: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n);
+}
 
 export default function ResearchInput({ onSubmit, isLoading }: Props) {
   const [query, setQuery] = useState("");
+  const [suggestions] = useState(() => pickRandom(EXAMPLE_QUERIES, 3));
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -48,7 +63,7 @@ export default function ResearchInput({ onSubmit, isLoading }: Props) {
       </form>
       {!isLoading && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {EXAMPLE_QUERIES.map((q) => (
+          {suggestions.map((q) => (
             <button
               key={q}
               onClick={() => setQuery(q)}

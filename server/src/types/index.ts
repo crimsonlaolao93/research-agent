@@ -25,3 +25,18 @@ export interface ResearchResult {
 }
 
 export type EmitFn = (event: string, data: unknown) => void;
+
+export interface TraceMessage {
+  role: string;
+  content: string;
+}
+
+export interface TraceEntry {
+  phase: string;
+  label: string;
+  messages: TraceMessage[];
+  response: string;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+}

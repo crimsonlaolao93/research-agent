@@ -2,7 +2,8 @@ import { useState, useRef } from "react";
 import ResearchInput from "./components/ResearchInput";
 import AgentActivityFeed from "./components/AgentActivityFeed";
 import ResearchReport from "./components/ResearchReport";
-import { ActivityItem, ResearchResult } from "./types";
+import TraceInspector from "./components/TraceInspector";
+import { ActivityItem, ResearchResult, TraceEntry } from "./types";
 
 type AppState = "idle" | "running" | "done" | "error";
 
@@ -11,6 +12,8 @@ export default function App() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [result, setResult] = useState<ResearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [traces, setTraces] = useState<TraceEntry[]>([]);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const resultReceived = useRef(false);
 
   const handleResearch = (query: string) => {
@@ -18,6 +21,8 @@ export default function App() {
     setActivity([]);
     setResult(null);
     setError(null);
+    setTraces([]);
+    setInspectorOpen(false);
     resultReceived.current = false;
 
     const url = `/api/research?q=${encodeURIComponent(query)}`;
@@ -39,6 +44,10 @@ export default function App() {
 
     eventSource.addEventListener("search", (e: MessageEvent) => {
       addActivity("search", JSON.parse(e.data));
+    });
+
+    eventSource.addEventListener("trace", (e: MessageEvent) => {
+      setTraces((prev) => [...prev, JSON.parse(e.data) as TraceEntry]);
     });
 
     eventSource.addEventListener("result", (e: MessageEvent) => {
@@ -89,6 +98,10 @@ export default function App() {
         </div>
       </header>
 
+      {inspectorOpen && (
+        <TraceInspector traces={traces} onClose={() => setInspectorOpen(false)} />
+      )}
+
       {/* Main */}
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         <ResearchInput
@@ -103,6 +116,8 @@ export default function App() {
               <AgentActivityFeed
                 activity={activity}
                 isRunning={state === "running"}
+                traces={traces}
+                onOpenTraces={() => setInspectorOpen(true)}
               />
             </div>
 

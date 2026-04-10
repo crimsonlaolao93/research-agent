@@ -6,8 +6,22 @@ interface Props {
   result: ResearchResult;
 }
 
+function downloadFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function toSafeFilename(query: string) {
+  return query.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "report";
+}
+
 export default function ResearchReport({ result }: Props) {
-  const { report, sources, evaluation } = result;
+  const { query, report, sources, evaluation } = result;
   const scoreColor =
     evaluation.score >= 80
       ? "#4ade80"
@@ -15,8 +29,88 @@ export default function ResearchReport({ result }: Props) {
         ? "#facc15"
         : "#f87171";
 
+  const handleMarkdownExport = () => {
+    const sourcesList = sources
+      .map((s, i) => `[${i + 1}] [${s.title}](${s.url})\n    ${s.snippet}`)
+      .join("\n\n");
+
+    const md = [
+      `# Research Report: ${query}`,
+      "",
+      report,
+      "",
+      "---",
+      "",
+      "## Sources",
+      "",
+      sourcesList,
+      "",
+      "---",
+      "",
+      "## Quality Evaluation",
+      "",
+      `**Score:** ${evaluation.score}/100`,
+      "",
+      `**Completeness:** ${evaluation.completeness}`,
+      "",
+      "**Strengths:**",
+      evaluation.strengths.map((s) => `- ${s}`).join("\n"),
+      "",
+      "**Gaps:**",
+      evaluation.gaps.map((g) => `- ${g}`).join("\n"),
+    ].join("\n");
+
+    downloadFile(md, `${toSafeFilename(query)}.md`, "text/markdown");
+  };
+
+  const handleJsonExport = () => {
+    downloadFile(
+      JSON.stringify(result, null, 2),
+      `${toSafeFilename(query)}.json`,
+      "application/json"
+    );
+  };
+
+  const handlePdfExport = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-4">
+      {/* Export toolbar */}
+      <div className="flex items-center justify-between">
+        <p className="text-gray-500 text-xs">Research complete</p>
+        <div className="flex gap-2">
+          <button
+            onClick={handleMarkdownExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-medium transition-colors border border-gray-700"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Markdown
+          </button>
+          <button
+            onClick={handleJsonExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-medium transition-colors border border-gray-700"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            JSON
+          </button>
+          <button
+            onClick={handlePdfExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-medium transition-colors border border-gray-700"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print / PDF
+          </button>
+        </div>
+      </div>
+
       {/* Quality evaluation card */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
         <div className="flex items-center justify-between mb-3">

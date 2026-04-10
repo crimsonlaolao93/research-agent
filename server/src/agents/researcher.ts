@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { webSearch } from '../tools/search';
-import { EmitFn, Finding, Source } from '../types';
+import { EmitFn, Finding, Source, TraceEntry, TraceMessage } from '../types';
 
 const client = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY,
@@ -42,6 +42,9 @@ Question: ${subQuestion}`,
 
   const allSources: Source[] = [];
   let finalAnswer = '';
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  const start = Date.now();
 
   // Tool use loop — max 5 search iterations
   for (let i = 0; i < 5; i++) {
@@ -51,6 +54,9 @@ Question: ${subQuestion}`,
       tools: [SEARCH_TOOL],
       messages,
     });
+
+    totalInputTokens += response.usage?.prompt_tokens ?? 0;
+    totalOutputTokens += response.usage?.completion_tokens ?? 0;
 
     const choice = response.choices[0];
 
@@ -85,6 +91,42 @@ Question: ${subQuestion}`,
       }
     }
   }
+
+  const latencyMs = Date.now() - start;
+
+  // Serialize full conversation for trace, truncating long tool results
+  const traceMessages: TraceMessage[] = messages.map((m) => {
+    if (m.role === 'assistant') {
+      const am = m as OpenAI.ChatCompletionAssistantMessageParam;
+      if (am.tool_calls && am.tool_calls.length > 0) {
+        const calls = am.tool_calls
+          .map((tc) => `[tool_call: ${tc.function.name}(${tc.function.arguments})]`)
+          .join('\n');
+        return { role: 'assistant', content: calls };
+      }
+      return { role: 'assistant', content: typeof am.content === 'string' ? am.content : '' };
+    }
+    if (m.role === 'tool') {
+      const tm = m as OpenAI.ChatCompletionToolMessageParam;
+      const raw = typeof tm.content === 'string' ? tm.content : JSON.stringify(tm.content);
+      const content = raw.length > 800 ? raw.slice(0, 800) + '\n… [truncated]' : raw;
+      return { role: 'tool', content };
+    }
+    return {
+      role: m.role,
+      content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+    };
+  });
+
+  emit('trace', {
+    phase: 'researching',
+    label: `Researcher: ${subQuestion}`,
+    messages: traceMessages,
+    response: finalAnswer,
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
+    latencyMs,
+  } as TraceEntry);
 
   // Deduplicate sources by URL, keep top 8
   const uniqueSources = Array.from(new Map(allSources.map(s => [s.url, s])).values()).slice(0, 8);
