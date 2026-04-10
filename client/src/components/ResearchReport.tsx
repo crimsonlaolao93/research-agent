@@ -1,9 +1,12 @@
+import { useState, FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ResearchResult } from "../types";
 
 interface Props {
   result: ResearchResult;
+  onFollowUp: (query: string) => void;
+  isLoading: boolean;
 }
 
 function downloadFile(content: string, filename: string, mimeType: string) {
@@ -20,8 +23,17 @@ function toSafeFilename(query: string) {
   return query.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "report";
 }
 
-export default function ResearchReport({ result }: Props) {
+export default function ResearchReport({ result, onFollowUp, isLoading }: Props) {
   const { query, report, sources, evaluation } = result;
+  const [followUp, setFollowUp] = useState("");
+
+  const handleFollowUpSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (followUp.trim() && !isLoading) {
+      onFollowUp(followUp.trim());
+      setFollowUp("");
+    }
+  };
   const scoreColor =
     evaluation.score >= 80
       ? "#4ade80"
@@ -159,6 +171,28 @@ export default function ResearchReport({ result }: Props) {
         <div className="prose prose-invert prose-sm max-w-none prose-headings:text-white prose-p:text-gray-300 prose-li:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-code:text-gray-200 prose-code:bg-gray-800 prose-pre:bg-gray-800">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{report}</ReactMarkdown>
         </div>
+      </div>
+
+      {/* Follow-up */}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+        <p className="text-gray-500 text-xs mb-3">Ask a follow-up — the agent will build on this research</p>
+        <form onSubmit={handleFollowUpSubmit} className="flex gap-2">
+          <input
+            type="text"
+            value={followUp}
+            onChange={(e) => setFollowUp(e.target.value)}
+            placeholder="e.g. Now focus on the regulatory implications..."
+            disabled={isLoading}
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 text-sm transition-colors disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !followUp.trim()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 text-white rounded-lg font-medium text-sm transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
+          >
+            {isLoading ? "Researching..." : "Follow up"}
+          </button>
+        </form>
       </div>
 
       {/* Sources */}

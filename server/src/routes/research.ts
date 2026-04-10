@@ -4,17 +4,12 @@ import { researchSubQuestion } from "../agents/researcher";
 import { synthesizeReport } from "../agents/synthesizer";
 import { evaluateReport } from "../agents/evaluator";
 import { EmitFn } from "../types";
+import { vectorStore } from "../lib/vectorStore";
+import { embedText, embeddingsAvailable } from "../lib/embeddings";
 
 const router = Router();
 
-router.get("/research", async (req: Request, res: Response) => {
-  const query = req.query.q as string;
-
-  if (!query?.trim()) {
-    res.status(400).json({ error: 'Query parameter "q" is required' });
-    return;
-  }
-
+async function runPipeline(query: string, previousReport: string | undefined, res: Response) {
   // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -27,21 +22,37 @@ router.get("/research", async (req: Request, res: Response) => {
   };
 
   try {
-    // 1. Plan — break query into sub-questions
-    const subQuestions = await planResearch(query, emit);
+    // Retrieve relevant document chunks from the vector store (RAG)
+    let documentContext: string | undefined;
+    if (embeddingsAvailable && vectorStore.chunkCount > 0) {
+      try {
+        const queryEmbedding = await embedText(query);
+        const chunks = vectorStore.search(queryEmbedding, 5);
+        if (chunks.length > 0) {
+          emit("step", {
+            phase: "planning",
+            message: `Found ${chunks.length} relevant passage${chunks.length > 1 ? "s" : ""} from uploaded documents`,
+          });
+          documentContext = chunks
+            .map((c) => `[Source: ${c.docName}]\n${c.text}`)
+            .join("\n\n---\n\n");
+        }
+      } catch (err) {
+        // RAG failure must not break the main pipeline
+        console.warn("[research] RAG retrieval failed, continuing without:", err);
+      }
+    }
 
-    // 2. Research all sub-questions in parallel
+    const subQuestions = await planResearch(query, emit, previousReport);
+
     const findings = await Promise.all(
       subQuestions.map((subQuestion) => researchSubQuestion(subQuestion, emit)),
     );
 
-    // 3. Synthesize findings into a report
-    const { report, sources } = await synthesizeReport(query, findings, emit);
+    const { report, sources } = await synthesizeReport(query, findings, emit, previousReport, documentContext);
 
-    // 4. Evaluate the report
     const evaluation = await evaluateReport(query, report, emit);
 
-    // 5. Send final result
     emit("result", { query, report, sources, evaluation });
   } catch (error: unknown) {
     const message =
@@ -51,6 +62,29 @@ router.get("/research", async (req: Request, res: Response) => {
   } finally {
     res.end();
   }
+}
+
+// GET — new queries (keeps backward-compat, e.g. direct URL access)
+router.get("/research", async (req: Request, res: Response) => {
+  const query = (req.query.q as string)?.trim();
+  if (!query) {
+    res.status(400).json({ error: 'Query parameter "q" is required' });
+    return;
+  }
+  await runPipeline(query, undefined, res);
+});
+
+// POST — supports previousReport for follow-up queries
+router.post("/research", async (req: Request, res: Response) => {
+  const { query, previousReport } = req.body as {
+    query?: string;
+    previousReport?: string;
+  };
+  if (!query?.trim()) {
+    res.status(400).json({ error: '"query" is required' });
+    return;
+  }
+  await runPipeline(query.trim(), previousReport, res);
 });
 
 export default router;

@@ -41,6 +41,14 @@ export interface ActivityItem {
   timestamp: Date;
 }
 
+export interface Session {
+  id: string;
+  query: string;
+  timestamp: string; // ISO string
+  result: ResearchResult;
+  traces: TraceEntry[];
+}
+
 export interface TraceMessage {
   role: string;
   content: string;

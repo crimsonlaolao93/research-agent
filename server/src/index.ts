@@ -4,6 +4,7 @@ import fs from "fs";
 import express from "express";
 import cors from "cors";
 import researchRouter from "./routes/research";
+import documentsRouter from "./routes/documents";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -19,6 +20,7 @@ app.use(
 app.use(express.json());
 
 app.use("/api", researchRouter);
+app.use("/api", documentsRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
