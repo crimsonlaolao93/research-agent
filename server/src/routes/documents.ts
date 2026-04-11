@@ -19,7 +19,11 @@ const upload = multer({
       file.mimetype === 'text/plain' ||
       file.mimetype === 'application/pdf' ||
       file.originalname.endsWith('.md');
-    cb(ok ? null : new Error('Only .txt, .md, and .pdf files are supported'), ok);
+    if (ok) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .txt, .md, and .pdf files are supported'));
+    }
   },
 });
 
@@ -85,7 +89,7 @@ router.post('/documents/upload', upload.single('file'), async (req: Request, res
 
 // DELETE /api/documents/:id — remove a document and all its chunks
 router.delete('/documents/:id', (req: Request, res: Response) => {
-  vectorStore.deleteDocument(req.params.id);
+  vectorStore.deleteDocument(req.params.id as string);
   res.json({ ok: true });
 });
 
