@@ -90,9 +90,9 @@ export default function ResearchReport({ result, onFollowUp, isLoading }: Props)
   return (
     <div className="space-y-4">
       {/* Export toolbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <p className="text-gray-500 text-xs">Research complete</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={handleMarkdownExport}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-medium transition-colors border border-gray-700"
@@ -135,7 +135,7 @@ export default function ResearchReport({ result, onFollowUp, isLoading }: Props)
           </div>
         </div>
         <p className="text-gray-400 text-xs mb-4">{evaluation.completeness}</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className="text-green-400 text-xs font-semibold mb-1.5 uppercase tracking-wide">
               Strengths
@@ -176,7 +176,7 @@ export default function ResearchReport({ result, onFollowUp, isLoading }: Props)
       {/* Follow-up */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
         <p className="text-gray-500 text-xs mb-3">Ask a follow-up — the agent will build on this research</p>
-        <form onSubmit={handleFollowUpSubmit} className="flex gap-2">
+        <form onSubmit={handleFollowUpSubmit} className="flex flex-col sm:flex-row gap-2">
           <input
             type="text"
             value={followUp}
@@ -188,7 +188,7 @@ export default function ResearchReport({ result, onFollowUp, isLoading }: Props)
           <button
             type="submit"
             disabled={isLoading || !followUp.trim()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 text-white rounded-lg font-medium text-sm transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 text-white rounded-lg font-medium text-sm transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
           >
             {isLoading ? "Researching..." : "Follow up"}
           </button>

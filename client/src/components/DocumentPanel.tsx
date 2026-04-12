@@ -86,7 +86,7 @@ export default function DocumentPanel() {
         </div>
         <div className="flex items-center gap-2">
           {docs.length > 0 && (
-            <span className="text-xs text-green-400">Active in next query</span>
+            <span className="hidden sm:inline text-xs text-green-400">Active in next query</span>
           )}
           <svg
             className={`w-4 h-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}

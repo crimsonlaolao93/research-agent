@@ -44,7 +44,7 @@ export default function ResearchInput({ onSubmit, isLoading }: Props) {
       <p className="text-gray-500 text-sm mb-4">
         The agent will plan, search the web, and synthesize a full report.
       </p>
-      <form onSubmit={handleSubmit} className="flex gap-3">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
         <input
           type="text"
           value={query}
@@ -56,7 +56,7 @@ export default function ResearchInput({ onSubmit, isLoading }: Props) {
         <button
           type="submit"
           disabled={isLoading || !query.trim()}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 text-white rounded-lg font-medium text-sm transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
+          className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 text-white rounded-lg font-medium text-sm transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
         >
           {isLoading ? "Researching..." : "Research"}
         </button>

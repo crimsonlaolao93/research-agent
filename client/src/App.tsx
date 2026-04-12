@@ -142,7 +142,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-950">
       {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4">
+      <header className="border-b border-gray-800 px-4 sm:px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
@@ -187,7 +187,7 @@ export default function App() {
       )}
 
       {/* Main */}
-      <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         <DocumentPanel />
         <ResearchInput onSubmit={(q) => handleResearch(q)} isLoading={state === "running"} />
 
