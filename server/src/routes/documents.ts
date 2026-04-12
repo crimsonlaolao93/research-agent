@@ -22,7 +22,8 @@ const upload = multer({
     if (ok) {
       cb(null, true);
     } else {
-      cb(new Error('Only .txt, .md, and .pdf files are supported'));
+      // Cast needed: @types/multer@2.1.0 conflates overload signatures in strict mode
+      (cb as (err: Error) => void)(new Error('Only .txt, .md, and .pdf files are supported'));
     }
   },
 });
@@ -89,7 +90,8 @@ router.post('/documents/upload', upload.single('file'), async (req: Request, res
 
 // DELETE /api/documents/:id — remove a document and all its chunks
 router.delete('/documents/:id', (req: Request, res: Response) => {
-  vectorStore.deleteDocument(req.params.id as string);
+  const id = req.params['id'];
+  vectorStore.deleteDocument(Array.isArray(id) ? id[0] : id);
   res.json({ ok: true });
 });
 

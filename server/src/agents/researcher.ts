@@ -100,11 +100,13 @@ Question: ${subQuestion}`,
       const am = m as OpenAI.ChatCompletionAssistantMessageParam;
       if (am.tool_calls && am.tool_calls.length > 0) {
         const calls = am.tool_calls
-          .map((tc) =>
-            tc.type === 'function'
-              ? `[tool_call: ${tc.function.name}(${tc.function.arguments})]`
-              : `[tool_call: ${tc.type}]`,
-          )
+          .map((tc) => {
+            if (tc.type === 'function') {
+              const f = (tc as OpenAI.ChatCompletionMessageFunctionToolCall).function;
+              return `[tool_call: ${f.name}(${f.arguments})]`;
+            }
+            return `[tool_call: ${tc.type}]`;
+          })
           .join('\n');
         return { role: 'assistant', content: calls };
       }
