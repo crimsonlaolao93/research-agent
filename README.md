@@ -39,7 +39,7 @@ The synthesizer streams its output token-by-token. The report appears word-by-wo
 
 ### Knowledge base (RAG)
 
-Upload `.txt`, `.md`, or `.pdf` files (up to 10 MB each) to a collapsible **Knowledge Base** panel. Documents are chunked, embedded via DeepSeek's `deepseek-embedding-v2` model, and stored in an in-memory vector store. On the next research query the top-5 most relevant passages are retrieved and injected into the synthesizer prompt as primary sources. No extra API key required — the same `DEEPSEEK_API_KEY` used for the rest of the pipeline is reused.
+Upload `.txt`, `.md`, or `.pdf` files (up to 10 MB each) to a collapsible **Knowledge Base** panel. Documents are chunked, embedded using a local ONNX model (`all-MiniLM-L6-v2` via `@xenova/transformers`), and stored in an in-memory vector store. On the next research query the top-5 most relevant passages are retrieved and injected into the synthesizer prompt as primary sources. No API key required — embeddings run entirely in-process.
 
 ### Session history
 
@@ -89,7 +89,7 @@ The query input shows 3 example prompts picked at random on each page load from 
 | Frontend   | React 18, TypeScript, Vite, Tailwind CSS             |
 | Backend    | Node.js, Express, TypeScript, tsx                    |
 | LLM        | DeepSeek (`deepseek-chat`) via OpenAI-compatible API |
-| Embeddings | DeepSeek `deepseek-embedding-v2` (same API key, for RAG) |
+| Embeddings | Local ONNX model via `@xenova/transformers` (no API key) |
 | Search     | Tavily Web Search API                                |
 | Streaming  | Server-Sent Events (SSE)                             |
 

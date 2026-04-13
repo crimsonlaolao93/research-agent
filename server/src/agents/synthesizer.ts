@@ -1,9 +1,9 @@
-import OpenAI from 'openai';
-import { EmitFn, Finding, Source, TraceEntry } from '../types';
+import OpenAI from "openai";
+import { EmitFn, Finding, Source, TraceEntry } from "../types";
 
 const client = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com',
+  baseURL: "https://api.deepseek.com",
 });
 
 export async function synthesizeReport(
@@ -13,25 +13,29 @@ export async function synthesizeReport(
   previousReport?: string,
   documentContext?: string,
 ): Promise<{ report: string; sources: Source[] }> {
-  emit('step', {
-    phase: 'synthesizing',
+  emit("step", {
+    phase: "synthesizing",
     message: previousReport
-      ? 'Extending existing report with new findings...'
-      : 'Synthesizing findings into a structured report...',
+      ? "Extending existing report with new findings..."
+      : "Synthesizing findings into a structured report...",
   });
 
   const findingsText = findings
-    .map(f => `### Sub-question: ${f.question}\n\n${f.answer}`)
-    .join('\n\n---\n\n');
+    .map((f) => `### Sub-question: ${f.question}\n\n${f.answer}`)
+    .join("\n\n---\n\n");
 
-  const allSources = findings.flatMap(f => f.sources);
-  const uniqueSources = Array.from(new Map(allSources.map(s => [s.url, s])).values());
+  const allSources = findings.flatMap((f) => f.sources);
+  const uniqueSources = Array.from(
+    new Map(allSources.map((s) => [s.url, s])).values(),
+  );
 
-  const sourcesText = uniqueSources.map((s, i) => `[${i + 1}] ${s.title} — ${s.url}`).join('\n');
+  const sourcesText = uniqueSources
+    .map((s, i) => `[${i + 1}] ${s.title} — ${s.url}`)
+    .join("\n");
 
   const docSection = documentContext
     ? `\n\nAdditional context from user-uploaded documents (treat these as primary sources where relevant — cite by document name):\n\n${documentContext}`
-    : '';
+    : "";
 
   const userContent = previousReport
     ? `You are a research analyst extending an existing report with new findings.
@@ -71,27 +75,27 @@ Write a professional markdown report with:
 Be thorough, well-organized, and cite sources inline where relevant.`;
 
   const synthMessages: OpenAI.ChatCompletionMessageParam[] = [
-    { role: 'user', content: userContent },
+    { role: "user", content: userContent },
   ];
 
   const start = Date.now();
   const stream = await client.chat.completions.create({
-    model: 'deepseek-chat',
+    model: "deepseek-chat",
     max_tokens: 4096,
     messages: synthMessages,
     stream: true,
     stream_options: { include_usage: true },
   });
 
-  let report = '';
+  let report = "";
   let inputTokens = 0;
   let outputTokens = 0;
 
   for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta?.content ?? '';
+    const delta = chunk.choices[0]?.delta?.content ?? "";
     if (delta) {
       report += delta;
-      emit('report_chunk', { text: delta });
+      emit("report_chunk", { text: delta });
     }
     if (chunk.usage) {
       inputTokens = chunk.usage.prompt_tokens ?? 0;
@@ -101,12 +105,13 @@ Be thorough, well-organized, and cite sources inline where relevant.`;
 
   const latencyMs = Date.now() - start;
 
-  emit('trace', {
-    phase: 'synthesizing',
-    label: 'Synthesizer',
+  emit("trace", {
+    phase: "synthesizing",
+    label: "Synthesizer",
     messages: synthMessages.map((m) => ({
       role: m.role,
-      content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+      content:
+        typeof m.content === "string" ? m.content : JSON.stringify(m.content),
     })),
     response: report,
     inputTokens,

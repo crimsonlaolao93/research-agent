@@ -14,8 +14,9 @@ const isProd = process.env.NODE_ENV === "production";
 // In dev, allow the Vite dev server. CORS_ORIGIN can override either way.
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN ?? (isProd ? false : "http://localhost:5173"),
-  })
+    origin:
+      process.env.CORS_ORIGIN ?? (isProd ? false : "http://localhost:5173"),
+  }),
 );
 app.use(express.json());
 

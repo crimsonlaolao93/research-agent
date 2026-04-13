@@ -14,7 +14,9 @@ export interface DocumentChunk {
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0, normA = 0, normB = 0;
+  let dot = 0,
+    normA = 0,
+    normB = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
     normA += a[i] * a[i];
@@ -39,10 +41,17 @@ class VectorStore {
   }
 
   // Returns top-K chunks above a relevance threshold, sorted by score
-  search(queryEmbedding: number[], topK = 5, threshold = 0.25): DocumentChunk[] {
+  search(
+    queryEmbedding: number[],
+    topK = 5,
+    threshold = 0.25,
+  ): DocumentChunk[] {
     if (this.chunks.length === 0) return [];
     return this.chunks
-      .map((chunk) => ({ chunk, score: cosineSimilarity(chunk.embedding, queryEmbedding) }))
+      .map((chunk) => ({
+        chunk,
+        score: cosineSimilarity(chunk.embedding, queryEmbedding),
+      }))
       .filter(({ score }) => score >= threshold)
       .sort((a, b) => b.score - a.score)
       .slice(0, topK)

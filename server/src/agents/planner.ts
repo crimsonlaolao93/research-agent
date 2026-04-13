@@ -57,7 +57,8 @@ Respond with ONLY a JSON array of strings (the sub-questions), no explanation or
     label: "Planner",
     messages: messages.map((m) => ({
       role: m.role,
-      content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+      content:
+        typeof m.content === "string" ? m.content : JSON.stringify(m.content),
     })),
     response: text,
     inputTokens: response.usage?.prompt_tokens ?? 0,

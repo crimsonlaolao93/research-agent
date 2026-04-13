@@ -2,8 +2,15 @@
  * Splits text into overlapping chunks, preferring to break at paragraph or
  * sentence boundaries so each chunk is semantically coherent.
  */
-export function chunkText(text: string, maxChars = 800, overlap = 150): string[] {
-  const normalized = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+export function chunkText(
+  text: string,
+  maxChars = 800,
+  overlap = 150,
+): string[] {
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   if (normalized.length <= maxChars) {
     return normalized.length > 30 ? [normalized] : [];
@@ -21,12 +28,12 @@ export function chunkText(text: string, maxChars = 800, overlap = 150): string[]
     }
 
     // Prefer paragraph boundary
-    const paraBreak = normalized.lastIndexOf('\n\n', end);
+    const paraBreak = normalized.lastIndexOf("\n\n", end);
     if (paraBreak > start + maxChars / 2) {
       end = paraBreak;
     } else {
       // Fall back to sentence boundary
-      const sentenceBreak = normalized.lastIndexOf('. ', end);
+      const sentenceBreak = normalized.lastIndexOf(". ", end);
       if (sentenceBreak > start + maxChars / 2) {
         end = sentenceBreak + 1;
       }

@@ -9,7 +9,11 @@ import { embedText, embeddingsAvailable } from "../lib/embeddings";
 
 const router = Router();
 
-async function runPipeline(query: string, previousReport: string | undefined, res: Response) {
+async function runPipeline(
+  query: string,
+  previousReport: string | undefined,
+  res: Response,
+) {
   // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -39,7 +43,10 @@ async function runPipeline(query: string, previousReport: string | undefined, re
         }
       } catch (err) {
         // RAG failure must not break the main pipeline
-        console.warn("[research] RAG retrieval failed, continuing without:", err);
+        console.warn(
+          "[research] RAG retrieval failed, continuing without:",
+          err,
+        );
       }
     }
 
@@ -49,7 +56,13 @@ async function runPipeline(query: string, previousReport: string | undefined, re
       subQuestions.map((subQuestion) => researchSubQuestion(subQuestion, emit)),
     );
 
-    const { report, sources } = await synthesizeReport(query, findings, emit, previousReport, documentContext);
+    const { report, sources } = await synthesizeReport(
+      query,
+      findings,
+      emit,
+      previousReport,
+      documentContext,
+    );
 
     const evaluation = await evaluateReport(query, report, emit);
 

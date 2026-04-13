@@ -1,36 +1,35 @@
-import OpenAI from 'openai';
+import { pipeline, env } from "@xenova/transformers";
 
-// RAG uses the same DEEPSEEK_API_KEY as the rest of the pipeline — no extra key needed.
-export const embeddingsAvailable = !!process.env.DEEPSEEK_API_KEY;
+// Cache models in /tmp so Railway's read-only app filesystem isn't an issue.
+env.cacheDir = "/tmp/.transformers-cache";
 
-// Lazily initialized — avoids a startup crash if the key is somehow absent.
-let _client: OpenAI | null = null;
-function getClient(): OpenAI {
-  if (!_client) {
-    _client = new OpenAI({
-      apiKey: process.env.DEEPSEEK_API_KEY,
-      baseURL: 'https://api.deepseek.com',
-    });
-  }
-  return _client;
-}
-
-const EMBEDDING_MODEL = 'deepseek-embedding-v2';
+// Local model — no API key required. Downloads ~23 MB on first use, then cached.
+const MODEL = "Xenova/all-MiniLM-L6-v2"; // 384-dim sentence embeddings
 const MAX_INPUT_CHARS = 8000;
 
-export async function embedText(text: string): Promise<number[]> {
-  const response = await getClient().embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: text.slice(0, MAX_INPUT_CHARS),
-  });
-  return response.data[0].embedding;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _extractor: any = null;
+
+async function getExtractor() {
+  if (!_extractor) {
+    _extractor = await pipeline("feature-extraction", MODEL);
+  }
+  return _extractor;
 }
 
-// Batch embed to reduce API round-trips during document ingestion
-export async function embedBatch(texts: string[]): Promise<number[][]> {
-  const response = await getClient().embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: texts.map((t) => t.slice(0, MAX_INPUT_CHARS)),
+// Always available — no external API dependency.
+export const embeddingsAvailable = true;
+
+export async function embedText(text: string): Promise<number[]> {
+  const extractor = await getExtractor();
+  const output = await extractor(text.slice(0, MAX_INPUT_CHARS), {
+    pooling: "mean",
+    normalize: true,
   });
-  return response.data.map((d) => d.embedding);
+  return Array.from(output.data as Float32Array);
+}
+
+// Batch embed for efficient document ingestion
+export async function embedBatch(texts: string[]): Promise<number[][]> {
+  return Promise.all(texts.map((t) => embedText(t)));
 }
