@@ -34,21 +34,25 @@ Sub-questions are researched in parallel with `Promise.all`, so total research t
 ## Features
 
 ### Streaming report rendering
+
 The synthesizer streams its output token-by-token. The report appears word-by-word in the browser as DeepSeek writes it — no waiting for the full generation to complete before seeing anything. A pulsing **Writing...** indicator shows while the stream is active, then the full report view (with sources, quality score, and export buttons) takes over once generation finishes.
 
 ### Knowledge base (RAG)
-Upload `.txt`, `.md`, or `.pdf` files (up to 10 MB each) to a collapsible **Knowledge Base** panel. Documents are chunked, embedded via OpenAI's `text-embedding-3-small` model, and stored in an in-memory vector store. On the next research query the top-5 most relevant passages are retrieved and injected into the synthesizer prompt as primary sources.
 
-> RAG requires an `OPENAI_API_KEY` environment variable. If it is not set the Knowledge Base panel is visible but disabled — the rest of the app works normally without it.
+Upload `.txt`, `.md`, or `.pdf` files (up to 10 MB each) to a collapsible **Knowledge Base** panel. Documents are chunked, embedded via DeepSeek's `deepseek-embedding-v2` model, and stored in an in-memory vector store. On the next research query the top-5 most relevant passages are retrieved and injected into the synthesizer prompt as primary sources. No extra API key required — the same `DEEPSEEK_API_KEY` used for the rest of the pipeline is reused.
 
 ### Session history
+
 Completed research sessions are saved to browser `localStorage` automatically. The **History** button in the header opens a panel listing all past sessions. Clicking any session restores its report and traces instantly without re-running the pipeline.
 
 ### Follow-up queries
+
 A follow-up input below each report lets you ask a related question. The agent receives the existing report as context and focuses its new research on aspects not already covered, then merges the new findings into an updated report.
 
 ### Report export
+
 Three download options appear above every completed report:
+
 - **Markdown** — the full report, sources, and quality evaluation as a `.md` file
 - **JSON** — the raw `ResearchResult` object as prettified `.json`
 - **Print / PDF** — triggers the browser's native print dialog (save as PDF)
@@ -56,7 +60,9 @@ Three download options appear above every completed report:
 Filenames are derived from the query (e.g. `what-is-quantum-computing.md`).
 
 ### Trace inspector
+
 Each agent call emits a structured `trace` event containing the raw prompt messages sent to the LLM, the raw response, token counts (input/output), and wall-clock latency. A **Traces** button appears in the activity feed once the first trace arrives. Clicking it opens a modal showing every agent call with:
+
 - Collapsible prompt section (full conversation history, including tool calls and search results for the researcher)
 - Raw LLM response
 - Token counts and latency per call
@@ -64,34 +70,36 @@ Each agent call emits a structured `trace` event containing the raw prompt messa
 This makes it straightforward to debug prompt failures and iterate on agent behaviour without touching backend logs.
 
 ### Run metrics
+
 After a run completes, a **Run Metrics** panel appears at the bottom of the activity feed showing a per-phase breakdown of:
+
 - **Latency** — wall-clock time per phase. For the researcher (parallel sub-questions) this is the max across sub-question traces, not the sum
 - **Proportional bar** — instantly shows which agent is the bottleneck
 - **Token counts** — input/output per phase in compact notation (e.g. `2.1k`)
 - **Total tokens** — combined across the whole run
 
 ### Randomised example prompts
+
 The query input shows 3 example prompts picked at random on each page load from a pool of 12 covering AI, biotech, energy, cryptography, economics, and more.
 
 ## Tech stack
 
-| Layer     | Technology |
-|-----------|-----------|
-| Frontend  | React 18, TypeScript, Vite, Tailwind CSS |
-| Backend   | Node.js, Express, TypeScript, tsx |
-| LLM       | DeepSeek (`deepseek-chat`) via OpenAI-compatible API |
-| Embeddings | OpenAI `text-embedding-3-small` (optional, for RAG) |
-| Search    | Tavily Web Search API |
-| Streaming | Server-Sent Events (SSE) |
+| Layer      | Technology                                           |
+| ---------- | ---------------------------------------------------- |
+| Frontend   | React 18, TypeScript, Vite, Tailwind CSS             |
+| Backend    | Node.js, Express, TypeScript, tsx                    |
+| LLM        | DeepSeek (`deepseek-chat`) via OpenAI-compatible API |
+| Embeddings | DeepSeek `deepseek-embedding-v2` (same API key, for RAG) |
+| Search     | Tavily Web Search API                                |
+| Streaming  | Server-Sent Events (SSE)                             |
 
 ## Getting started
 
 ### Prerequisites
 
 - Node.js 18+
-- A [DeepSeek API key](https://platform.deepseek.com/)
+- A [DeepSeek API key](https://platform.deepseek.com/) — used for planning, research, synthesis, evaluation, and embeddings
 - A [Tavily API key](https://tavily.com/)
-- _(Optional)_ An [OpenAI API key](https://platform.openai.com/) — only required to enable document upload and RAG
 
 ### Installation
 
@@ -111,9 +119,6 @@ cp .env.example .env
 DEEPSEEK_API_KEY=your-deepseek-api-key
 TAVILY_API_KEY=your-tavily-api-key
 PORT=3001
-
-# Optional — enables the Knowledge Base (RAG) feature
-OPENAI_API_KEY=your-openai-api-key
 ```
 
 ### Running locally
@@ -172,14 +177,14 @@ Body: `{ "query": string, "previousReport"?: string }`
 
 Returns an SSE stream. Events:
 
-| Event         | Payload | Description |
-|---------------|---------|-------------|
-| `step`        | `{ phase, message }` | Agent phase update |
-| `search`      | `{ query, subQuestion }` | A web search was issued |
-| `report_chunk`| `{ text }` | A token chunk from the streaming synthesizer |
-| `trace`       | `{ phase, label, messages, response, inputTokens, outputTokens, latencyMs }` | Raw LLM call data |
-| `result`      | `{ query, report, sources, evaluation }` | Final assembled report |
-| `error`       | `{ message }` | Pipeline error |
+| Event          | Payload                                                                      | Description                                  |
+| -------------- | ---------------------------------------------------------------------------- | -------------------------------------------- |
+| `step`         | `{ phase, message }`                                                         | Agent phase update                           |
+| `search`       | `{ query, subQuestion }`                                                     | A web search was issued                      |
+| `report_chunk` | `{ text }`                                                                   | A token chunk from the streaming synthesizer |
+| `trace`        | `{ phase, label, messages, response, inputTokens, outputTokens, latencyMs }` | Raw LLM call data                            |
+| `result`       | `{ query, report, sources, evaluation }`                                     | Final assembled report                       |
+| `error`        | `{ message }`                                                                | Pipeline error                               |
 
 ### `GET /api/documents`
 
@@ -200,6 +205,7 @@ The project is configured for deployment as a single service on [Railway](https:
 ### Deploy to Railway
 
 **1. Push to GitHub**
+
 ```bash
 git add .
 git commit -m "initial commit"
@@ -218,9 +224,6 @@ In Railway → your service → **Variables**:
 DEEPSEEK_API_KEY   = your-key-here
 TAVILY_API_KEY     = your-key-here
 NODE_ENV           = production
-
-# Optional
-OPENAI_API_KEY     = your-key-here
 ```
 
 > `PORT` is set automatically by Railway — do not add it manually.

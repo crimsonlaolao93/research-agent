@@ -48,7 +48,7 @@ router.get('/documents', (_req: Request, res: Response) => {
 router.post('/documents/upload', upload.single('file'), async (req: Request, res: Response) => {
   if (!embeddingsAvailable) {
     res.status(503).json({
-      error: 'RAG is disabled — add OPENAI_API_KEY to your .env to enable document upload',
+      error: 'RAG is disabled — DEEPSEEK_API_KEY is required to enable document upload',
     });
     return;
   }

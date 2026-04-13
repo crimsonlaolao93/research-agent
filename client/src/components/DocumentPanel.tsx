@@ -104,7 +104,7 @@ export default function DocumentPanel() {
             <div className="rounded-lg bg-yellow-950 border border-yellow-800 p-3">
               <p className="text-yellow-300 text-xs font-medium">RAG disabled</p>
               <p className="text-yellow-600 text-xs mt-0.5">
-                Add <code className="font-mono">OPENAI_API_KEY</code> to your <code className="font-mono">.env</code> to enable document upload and retrieval.
+                <code className="font-mono">DEEPSEEK_API_KEY</code> is required to enable document upload and retrieval.
               </p>
             </div>
           ) : (
