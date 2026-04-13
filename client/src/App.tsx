@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import DocumentPanel from "./components/DocumentPanel";
 import ResearchInput from "./components/ResearchInput";
 import AgentActivityFeed from "./components/AgentActivityFeed";
@@ -11,7 +13,9 @@ import { ActivityItem, ResearchResult, TraceEntry } from "./types";
 type AppState = "idle" | "running" | "done" | "error";
 
 // Parse a single SSE message block (separated by \n\n) into { event, data }
-function parseSseMessage(block: string): { event: string; data: string } | null {
+function parseSseMessage(
+  block: string,
+): { event: string; data: string } | null {
   let event = "message";
   let data = "";
   for (const line of block.split("\n")) {
@@ -25,12 +29,14 @@ export default function App() {
   const [state, setState] = useState<AppState>("idle");
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [result, setResult] = useState<ResearchResult | null>(null);
+  const [streamingReport, setStreamingReport] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [traces, setTraces] = useState<TraceEntry[]>([]);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const { sessions, saveSession, deleteSession, clearAll } = useSessionHistory();
+  const { sessions, saveSession, deleteSession, clearAll } =
+    useSessionHistory();
   const abortRef = useRef<AbortController | null>(null);
 
   const handleResearch = async (query: string, previousReport?: string) => {
@@ -42,11 +48,15 @@ export default function App() {
     setState("running");
     setActivity([]);
     setResult(null);
+    setStreamingReport("");
     setError(null);
     setTraces([]);
     setInspectorOpen(false);
 
-    const addActivity = (type: "step" | "search", data: ActivityItem["data"]) => {
+    const addActivity = (
+      type: "step" | "search",
+      data: ActivityItem["data"],
+    ) => {
       setActivity((prev) => [
         ...prev,
         { id: crypto.randomUUID(), type, data, timestamp: new Date() },
@@ -94,6 +104,9 @@ export default function App() {
             case "search":
               addActivity("search", data);
               break;
+            case "report_chunk":
+              setStreamingReport((prev) => prev + (data as { text: string }).text);
+              break;
             case "trace":
               finalTraces = [...finalTraces, data as TraceEntry];
               setTraces((prev) => [...prev, data as TraceEntry]);
@@ -117,7 +130,11 @@ export default function App() {
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Connection lost. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Connection lost. Please try again.",
+      );
       setState("error");
     }
   };
@@ -128,7 +145,9 @@ export default function App() {
     }
   };
 
-  const handleRestore = (session: ReturnType<typeof useSessionHistory>["sessions"][number]) => {
+  const handleRestore = (
+    session: ReturnType<typeof useSessionHistory>["sessions"][number],
+  ) => {
     setState("done");
     setActivity([]);
     setResult(session.result);
@@ -149,8 +168,12 @@ export default function App() {
               <span className="text-white text-sm font-bold">R</span>
             </div>
             <div>
-              <h1 className="text-white font-semibold text-base leading-none">Research Agent</h1>
-              <p className="text-gray-500 text-xs mt-0.5">AI-powered multi-step research</p>
+              <h1 className="text-white font-semibold text-base leading-none">
+                Research Agent
+              </h1>
+              <p className="text-gray-500 text-xs mt-0.5">
+                AI-powered multi-step research
+              </p>
             </div>
           </div>
 
@@ -159,8 +182,18 @@ export default function App() {
             onClick={() => setHistoryOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white text-xs font-medium transition-colors border border-gray-700"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             History
             {sessions.length > 0 && (
@@ -174,7 +207,10 @@ export default function App() {
 
       {/* Modals */}
       {inspectorOpen && (
-        <TraceInspector traces={traces} onClose={() => setInspectorOpen(false)} />
+        <TraceInspector
+          traces={traces}
+          onClose={() => setInspectorOpen(false)}
+        />
       )}
       {historyOpen && (
         <SessionHistory
@@ -189,7 +225,10 @@ export default function App() {
       {/* Main */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         <DocumentPanel />
-        <ResearchInput onSubmit={(q) => handleResearch(q)} isLoading={state === "running"} />
+        <ResearchInput
+          onSubmit={(q) => handleResearch(q)}
+          isLoading={state === "running"}
+        />
 
         {isActive && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -218,12 +257,27 @@ export default function App() {
                 />
               )}
               {state === "running" && !result && (
-                <div className="bg-gray-900 rounded-xl border border-gray-800 p-12 flex items-center justify-center">
-                  <div className="text-center space-y-2">
-                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-gray-500 text-sm">Generating report...</p>
+                streamingReport ? (
+                  <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                    <div className="flex items-center gap-2 mb-5">
+                      <h3 className="text-white font-medium text-sm">Research Report</h3>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                        <span className="text-blue-400 text-xs">Writing...</span>
+                      </span>
+                    </div>
+                    <div className="prose prose-invert prose-sm max-w-none prose-headings:text-white prose-p:text-gray-300 prose-li:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-code:text-gray-200 prose-code:bg-gray-800 prose-pre:bg-gray-800">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingReport}</ReactMarkdown>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-gray-900 rounded-xl border border-gray-800 p-12 flex items-center justify-center">
+                    <div className="text-center space-y-2">
+                      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                      <p className="text-gray-500 text-sm">Researching...</p>
+                    </div>
+                  </div>
+                )
               )}
             </div>
           </div>

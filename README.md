@@ -21,7 +21,7 @@ User query
       └──────────┬────────────┘
                  ▼
         ┌─────────────┐
-        │ Synthesizer │  Merges all findings into a structured markdown report
+        │ Synthesizer │  Streams the report token-by-token to the browser
         └──────┬──────┘
                ▼
         ┌─────────────┐
@@ -29,12 +29,26 @@ User query
         └─────────────┘
 ```
 
-Sub-questions are researched in parallel with `Promise.all`, so total research time scales with the slowest sub-question rather than the sum of all of them. Progress is streamed to the browser in real time via **Server-Sent Events (SSE)**, so you can watch each agent step and web search as they happen.
+Sub-questions are researched in parallel with `Promise.all`, so total research time scales with the slowest sub-question rather than the sum of all of them. Progress is streamed to the browser in real time via **Server-Sent Events (SSE)** — agent steps, web searches, and report tokens all arrive as they happen.
 
 ## Features
 
+### Streaming report rendering
+The synthesizer streams its output token-by-token. The report appears word-by-word in the browser as DeepSeek writes it — no waiting for the full generation to complete before seeing anything. A pulsing **Writing...** indicator shows while the stream is active, then the full report view (with sources, quality score, and export buttons) takes over once generation finishes.
+
+### Knowledge base (RAG)
+Upload `.txt`, `.md`, or `.pdf` files (up to 10 MB each) to a collapsible **Knowledge Base** panel. Documents are chunked, embedded via OpenAI's `text-embedding-3-small` model, and stored in an in-memory vector store. On the next research query the top-5 most relevant passages are retrieved and injected into the synthesizer prompt as primary sources.
+
+> RAG requires an `OPENAI_API_KEY` environment variable. If it is not set the Knowledge Base panel is visible but disabled — the rest of the app works normally without it.
+
+### Session history
+Completed research sessions are saved to browser `localStorage` automatically. The **History** button in the header opens a panel listing all past sessions. Clicking any session restores its report and traces instantly without re-running the pipeline.
+
+### Follow-up queries
+A follow-up input below each report lets you ask a related question. The agent receives the existing report as context and focuses its new research on aspects not already covered, then merges the new findings into an updated report.
+
 ### Report export
-Once a report is complete, three download options appear above the report:
+Three download options appear above every completed report:
 - **Markdown** — the full report, sources, and quality evaluation as a `.md` file
 - **JSON** — the raw `ResearchResult` object as prettified `.json`
 - **Print / PDF** — triggers the browser's native print dialog (save as PDF)
@@ -66,6 +80,7 @@ The query input shows 3 example prompts picked at random on each page load from 
 | Frontend  | React 18, TypeScript, Vite, Tailwind CSS |
 | Backend   | Node.js, Express, TypeScript, tsx |
 | LLM       | DeepSeek (`deepseek-chat`) via OpenAI-compatible API |
+| Embeddings | OpenAI `text-embedding-3-small` (optional, for RAG) |
 | Search    | Tavily Web Search API |
 | Streaming | Server-Sent Events (SSE) |
 
@@ -76,6 +91,7 @@ The query input shows 3 example prompts picked at random on each page load from 
 - Node.js 18+
 - A [DeepSeek API key](https://platform.deepseek.com/)
 - A [Tavily API key](https://tavily.com/)
+- _(Optional)_ An [OpenAI API key](https://platform.openai.com/) — only required to enable document upload and RAG
 
 ### Installation
 
@@ -95,6 +111,9 @@ cp .env.example .env
 DEEPSEEK_API_KEY=your-deepseek-api-key
 TAVILY_API_KEY=your-tavily-api-key
 PORT=3001
+
+# Optional — enables the Knowledge Base (RAG) feature
+OPENAI_API_KEY=your-openai-api-key
 ```
 
 ### Running locally
@@ -115,40 +134,64 @@ research-agent/
 ├── railway.toml             # Railway deployment config
 ├── client/                  # React frontend
 │   └── src/
-│       ├── App.tsx          # SSE connection, state management, trace collection
+│       ├── App.tsx          # SSE connection, state management, streaming report
 │       ├── components/
 │       │   ├── ResearchInput.tsx     # Query input + randomised example prompts
 │       │   ├── AgentActivityFeed.tsx # Live activity log + run metrics panel
 │       │   ├── ResearchReport.tsx    # Markdown report + sources + export buttons
-│       │   └── TraceInspector.tsx   # Modal showing raw prompts/responses per agent
+│       │   ├── DocumentPanel.tsx     # Knowledge base upload and management
+│       │   ├── SessionHistory.tsx    # Past sessions sidebar
+│       │   └── TraceInspector.tsx    # Modal showing raw prompts/responses per agent
+│       ├── hooks/
+│       │   └── useSessionHistory.ts  # localStorage persistence for sessions
 │       └── types/
 └── server/                  # Express backend
     └── src/
         ├── index.ts         # Server entry point, static file serving in production
         ├── routes/
-        │   └── research.ts  # SSE endpoint — orchestrates the pipeline
+        │   ├── research.ts  # SSE endpoint — orchestrates the pipeline
+        │   └── documents.ts # Document upload, listing, and deletion endpoints
         ├── agents/
-        │   ├── planner.ts   # Decomposes query into sub-questions, emits trace
-        │   ├── researcher.ts # Web search tool-use loop per sub-question, emits trace
-        │   ├── synthesizer.ts # Merges findings into a report, emits trace
-        │   └── evaluator.ts  # Scores and critiques the report, emits trace
+        │   ├── planner.ts      # Decomposes query into sub-questions
+        │   ├── researcher.ts   # Web search tool-use loop per sub-question
+        │   ├── synthesizer.ts  # Streams report tokens, merges findings
+        │   └── evaluator.ts    # Scores and critiques the report
+        ├── lib/
+        │   ├── vectorStore.ts  # In-memory vector store with cosine similarity search
+        │   ├── embeddings.ts   # OpenAI embeddings client (lazy-initialised)
+        │   └── chunker.ts      # Document text chunking for ingestion
         └── tools/
             └── search.ts    # Tavily web search wrapper
 ```
 
 ## API
 
-### `GET /api/research?q=<query>`
+### `POST /api/research`
+
+Body: `{ "query": string, "previousReport"?: string }`
 
 Returns an SSE stream. Events:
 
-| Event    | Payload | Description |
-|----------|---------|-------------|
-| `step`   | `{ phase, message }` | Agent phase update |
-| `search` | `{ query, subQuestion }` | A web search was issued |
-| `trace`  | `{ phase, label, messages, response, inputTokens, outputTokens, latencyMs }` | Raw LLM call data |
-| `result` | `{ query, report, sources, evaluation }` | Final report |
-| `error`  | `{ message }` | Pipeline error |
+| Event         | Payload | Description |
+|---------------|---------|-------------|
+| `step`        | `{ phase, message }` | Agent phase update |
+| `search`      | `{ query, subQuestion }` | A web search was issued |
+| `report_chunk`| `{ text }` | A token chunk from the streaming synthesizer |
+| `trace`       | `{ phase, label, messages, response, inputTokens, outputTokens, latencyMs }` | Raw LLM call data |
+| `result`      | `{ query, report, sources, evaluation }` | Final assembled report |
+| `error`       | `{ message }` | Pipeline error |
+
+### `GET /api/documents`
+
+Returns `{ available: boolean, documents: DocumentMeta[] }`. `available` is `false` when `OPENAI_API_KEY` is not set.
+
+### `POST /api/documents/upload`
+
+Multipart form upload (`file` field). Accepts `.txt`, `.md`, `.pdf` up to 10 MB. Returns `{ docId, name, chunkCount }`.
+
+### `DELETE /api/documents/:id`
+
+Removes a document and all its chunks from the vector store.
 
 ## Deployment
 
@@ -175,6 +218,9 @@ In Railway → your service → **Variables**:
 DEEPSEEK_API_KEY   = your-key-here
 TAVILY_API_KEY     = your-key-here
 NODE_ENV           = production
+
+# Optional
+OPENAI_API_KEY     = your-key-here
 ```
 
 > `PORT` is set automatically by Railway — do not add it manually.
@@ -192,7 +238,13 @@ npm run build
 
 npm start
   └── node server/dist/index.js
-        ├── serves /api/* routes (SSE pipeline)
+        ├── serves /api/* routes (SSE pipeline + document endpoints)
         ├── serves client/dist/ as static files
         └── catch-all → client/dist/index.html
 ```
+
+## Known limitations
+
+- **In-memory storage** — the vector store and session history are not persisted to disk. Documents are lost on server restart; session history is browser-local only. For production use, replace with a persistent vector DB (e.g. pgvector, Qdrant) and a database for sessions.
+- **Self-evaluated quality score** — the evaluator uses the same model that wrote the report. Scores are optimistic by nature and should be treated as a rough guide rather than a reliable quality signal.
+- **No authentication** — anyone with the URL can use your API keys. Add an auth layer before sharing the deployment publicly.

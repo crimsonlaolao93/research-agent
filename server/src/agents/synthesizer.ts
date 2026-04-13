@@ -75,14 +75,31 @@ Be thorough, well-organized, and cite sources inline where relevant.`;
   ];
 
   const start = Date.now();
-  const response = await client.chat.completions.create({
+  const stream = await client.chat.completions.create({
     model: 'deepseek-chat',
     max_tokens: 4096,
     messages: synthMessages,
+    stream: true,
+    stream_options: { include_usage: true },
   });
-  const latencyMs = Date.now() - start;
 
-  const report = response.choices[0].message.content ?? '';
+  let report = '';
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content ?? '';
+    if (delta) {
+      report += delta;
+      emit('report_chunk', { text: delta });
+    }
+    if (chunk.usage) {
+      inputTokens = chunk.usage.prompt_tokens ?? 0;
+      outputTokens = chunk.usage.completion_tokens ?? 0;
+    }
+  }
+
+  const latencyMs = Date.now() - start;
 
   emit('trace', {
     phase: 'synthesizing',
@@ -92,8 +109,8 @@ Be thorough, well-organized, and cite sources inline where relevant.`;
       content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
     })),
     response: report,
-    inputTokens: response.usage?.prompt_tokens ?? 0,
-    outputTokens: response.usage?.completion_tokens ?? 0,
+    inputTokens,
+    outputTokens,
     latencyMs,
   } as TraceEntry);
 
