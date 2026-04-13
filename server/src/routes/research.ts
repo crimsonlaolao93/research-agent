@@ -28,10 +28,10 @@ async function runPipeline(
   try {
     // Retrieve relevant document chunks from the vector store (RAG)
     let documentContext: string | undefined;
-    if (embeddingsAvailable && vectorStore.chunkCount > 0) {
+    if (embeddingsAvailable && (await vectorStore.getChunkCount()) > 0) {
       try {
         const queryEmbedding = await embedText(query);
-        const chunks = vectorStore.search(queryEmbedding, 5);
+        const chunks = await vectorStore.search(queryEmbedding, 5);
         if (chunks.length > 0) {
           emit("step", {
             phase: "planning",

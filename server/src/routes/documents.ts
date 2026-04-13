@@ -41,11 +41,14 @@ async function extractText(buffer: Buffer, mimetype: string): Promise<string> {
 }
 
 // GET /api/documents — list uploaded documents + RAG availability
-router.get("/documents", (_req: Request, res: Response) => {
-  res.json({
-    available: embeddingsAvailable,
-    documents: vectorStore.listDocuments(),
-  });
+router.get("/documents", async (_req: Request, res: Response) => {
+  try {
+    const documents = await vectorStore.listDocuments();
+    res.json({ available: embeddingsAvailable, documents });
+  } catch (err) {
+    console.error("[documents] List error:", err);
+    res.json({ available: embeddingsAvailable, documents: [] });
+  }
 });
 
 // POST /api/documents/upload — ingest a document into the vector store
@@ -81,7 +84,7 @@ router.post(
       const embeddings = await embedBatch(chunks);
 
       const docId = crypto.randomUUID();
-      vectorStore.addDocument(
+      await vectorStore.addDocument(
         {
           id: docId,
           name: file.originalname,
@@ -106,10 +109,15 @@ router.post(
 );
 
 // DELETE /api/documents/:id — remove a document and all its chunks
-router.delete("/documents/:id", (req: Request, res: Response) => {
-  const id = req.params["id"];
-  vectorStore.deleteDocument(Array.isArray(id) ? id[0] : id);
-  res.json({ ok: true });
+router.delete("/documents/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params["id"];
+    await vectorStore.deleteDocument(Array.isArray(id) ? id[0] : id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[documents] Delete error:", err);
+    res.status(500).json({ error: "Delete failed" });
+  }
 });
 
 export default router;

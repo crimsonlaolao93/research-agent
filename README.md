@@ -90,6 +90,7 @@ The query input shows 3 example prompts picked at random on each page load from 
 | Backend    | Node.js, Express, TypeScript, tsx                    |
 | LLM        | DeepSeek (`deepseek-chat`) via OpenAI-compatible API |
 | Embeddings | Local ONNX model via `@xenova/transformers` (no API key) |
+| Vector DB  | pgvector (PostgreSQL) with in-memory fallback        |
 | Search     | Tavily Web Search API                                |
 | Streaming  | Server-Sent Events (SSE)                             |
 
@@ -98,8 +99,9 @@ The query input shows 3 example prompts picked at random on each page load from 
 ### Prerequisites
 
 - Node.js 18+
-- A [DeepSeek API key](https://platform.deepseek.com/) — used for planning, research, synthesis, evaluation, and embeddings
+- A [DeepSeek API key](https://platform.deepseek.com/) — used for planning, research, synthesis, and evaluation
 - A [Tavily API key](https://tavily.com/)
+- (Optional) A PostgreSQL database with the [pgvector extension](https://github.com/pgvector/pgvector) — for persistent document storage across restarts
 
 ### Installation
 
@@ -119,6 +121,10 @@ cp .env.example .env
 DEEPSEEK_API_KEY=your-deepseek-api-key
 TAVILY_API_KEY=your-tavily-api-key
 PORT=3001
+
+# Optional — enables persistent vector storage via pgvector.
+# Without this, an in-memory store is used (documents lost on restart).
+# DATABASE_URL=postgresql://user:password@localhost:5432/research_agent
 ```
 
 ### Running locally
@@ -162,8 +168,9 @@ research-agent/
         │   ├── synthesizer.ts  # Streams report tokens, merges findings
         │   └── evaluator.ts    # Scores and critiques the report
         ├── lib/
-        │   ├── vectorStore.ts  # In-memory vector store with cosine similarity search
-        │   ├── embeddings.ts   # OpenAI embeddings client (lazy-initialised)
+        │   ├── db.ts           # pg Pool + initDb() — schema creation for pgvector
+        │   ├── vectorStore.ts  # Dual-backend: pgvector (DATABASE_URL) or in-memory fallback
+        │   ├── embeddings.ts   # Local ONNX embeddings via @xenova/transformers
         │   └── chunker.ts      # Document text chunking for ingestion
         └── tools/
             └── search.ts    # Tavily web search wrapper
@@ -188,7 +195,7 @@ Returns an SSE stream. Events:
 
 ### `GET /api/documents`
 
-Returns `{ available: boolean, documents: DocumentMeta[] }`. `available` is `false` when `OPENAI_API_KEY` is not set.
+Returns `{ available: boolean, documents: DocumentMeta[] }`. `available` is always `true` — embeddings run locally via `@xenova/transformers` and require no API key.
 
 ### `POST /api/documents/upload`
 
@@ -228,6 +235,16 @@ NODE_ENV           = production
 
 > `PORT` is set automatically by Railway — do not add it manually.
 
+**4a. (Recommended) Add a Postgres database for persistent document storage**
+
+In your Railway project dashboard click **+ New** → **Database** → **Add PostgreSQL**. Railway automatically sets `DATABASE_URL` in your service's environment. The server will detect it and:
+
+- Enable the `vector` extension on first startup
+- Create the `documents` and `document_chunks` tables with an HNSW index
+- Use pgvector for all document storage and similarity search
+
+Without this step, uploaded documents are stored in memory and lost on each redeploy. No code changes are needed — the app switches backends automatically based on whether `DATABASE_URL` is present.
+
 **4. Deploy**
 
 Railway builds and deploys on every push to `main`. The build runs `npm install && npm run build` (compiles TypeScript and bundles React), then starts the server with `npm start`. Your app will be live at a `*.railway.app` URL.
@@ -248,6 +265,7 @@ npm start
 
 ## Known limitations
 
-- **In-memory storage** — the vector store and session history are not persisted to disk. Documents are lost on server restart; session history is browser-local only. For production use, replace with a persistent vector DB (e.g. pgvector, Qdrant) and a database for sessions.
+- **Document persistence** — without `DATABASE_URL`, the in-memory vector store loses all uploaded documents on server restart. Add a Railway Postgres database (see deployment instructions) to persist documents across redeploys.
+- **Session history** — stored in browser `localStorage` only; not synced across devices or users.
 - **Self-evaluated quality score** — the evaluator uses the same model that wrote the report. Scores are optimistic by nature and should be treated as a rough guide rather than a reliable quality signal.
 - **No authentication** — anyone with the URL can use your API keys. Add an auth layer before sharing the deployment publicly.

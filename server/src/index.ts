@@ -5,6 +5,7 @@ import express from "express";
 import cors from "cors";
 import researchRouter from "./routes/research";
 import documentsRouter from "./routes/documents";
+import { initDb } from "./lib/db";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -39,6 +40,14 @@ if (isProd) {
   } else {
     console.warn("[warn] client/dist not found — frontend will not be served");
   }
+}
+
+// Initialise pgvector schema if DATABASE_URL is configured
+if (process.env.DATABASE_URL) {
+  initDb().catch((err) => {
+    console.error("[db] Failed to initialise database:", err);
+    process.exit(1);
+  });
 }
 
 app.listen(PORT, () => {
