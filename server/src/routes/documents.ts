@@ -59,7 +59,7 @@ router.post(
     if (!embeddingsAvailable) {
       res.status(503).json({
         error:
-          "RAG is disabled — DEEPSEEK_API_KEY is required to enable document upload",
+          "RAG is disabled — HF_TOKEN is required to enable document upload",
       });
       return;
     }

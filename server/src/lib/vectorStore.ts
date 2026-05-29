@@ -20,7 +20,11 @@ interface IVectorStore {
     meta: DocumentMeta,
     chunks: Array<{ id: string; text: string; embedding: number[] }>,
   ): Promise<void>;
-  search(queryEmbedding: number[], topK?: number, threshold?: number): Promise<DocumentChunk[]>;
+  search(
+    queryEmbedding: number[],
+    topK?: number,
+    threshold?: number,
+  ): Promise<DocumentChunk[]>;
   deleteDocument(docId: string): Promise<void>;
   listDocuments(): Promise<DocumentMeta[]>;
   getChunkCount(): Promise<number>;
@@ -62,7 +66,11 @@ class PgVectorStore implements IVectorStore {
     }
   }
 
-  async search(queryEmbedding: number[], topK = 5, threshold = 0.25): Promise<DocumentChunk[]> {
+  async search(
+    queryEmbedding: number[],
+    topK = 5,
+    threshold = 0.25,
+  ): Promise<DocumentChunk[]> {
     const result = await pool.query<DocumentChunk>(
       `SELECT id,
               doc_id   AS "docId",
@@ -105,7 +113,9 @@ class PgVectorStore implements IVectorStore {
 // ─── In-memory fallback (no DATABASE_URL) ───────────────────────────────────
 
 function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0, normA = 0, normB = 0;
+  let dot = 0,
+    normA = 0,
+    normB = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
     normA += a[i] * a[i];
@@ -129,9 +139,16 @@ class InMemoryVectorStore implements IVectorStore {
     }
   }
 
-  async search(queryEmbedding: number[], topK = 5, threshold = 0.25): Promise<DocumentChunk[]> {
+  async search(
+    queryEmbedding: number[],
+    topK = 5,
+    threshold = 0.25,
+  ): Promise<DocumentChunk[]> {
     return this.chunks
-      .map((chunk) => ({ chunk, score: cosineSimilarity(chunk.embedding, queryEmbedding) }))
+      .map((chunk) => ({
+        chunk,
+        score: cosineSimilarity(chunk.embedding, queryEmbedding),
+      }))
       .filter(({ score }) => score >= threshold)
       .sort((a, b) => b.score - a.score)
       .slice(0, topK)

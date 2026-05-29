@@ -3,7 +3,10 @@ import { Pool } from "pg";
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   // Railway Postgres requires SSL in production
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? { rejectUnauthorized: false }
+      : false,
 });
 
 export async function initDb(): Promise<void> {

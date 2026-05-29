@@ -39,7 +39,7 @@ The synthesizer streams its output token-by-token. The report appears word-by-wo
 
 ### Knowledge base (RAG)
 
-Upload `.txt`, `.md`, or `.pdf` files (up to 10 MB each) to a collapsible **Knowledge Base** panel. Documents are chunked, embedded using a local ONNX model (`all-MiniLM-L6-v2` via `@xenova/transformers`), and stored in an in-memory vector store. On the next research query the top-5 most relevant passages are retrieved and injected into the synthesizer prompt as primary sources. No API key required — embeddings run entirely in-process.
+Upload `.txt`, `.md`, or `.pdf` files (up to 10 MB each) to a collapsible **Knowledge Base** panel. Documents are chunked, embedded using `sentence-transformers/all-MiniLM-L6-v2` via the HuggingFace Inference API, and stored in a vector store. On the next research query the top-5 most relevant passages are retrieved and injected into the synthesizer prompt as primary sources. Requires a `HF_TOKEN` environment variable (free HuggingFace account).
 
 ### Session history
 
@@ -84,15 +84,15 @@ The query input shows 3 example prompts picked at random on each page load from 
 
 ## Tech stack
 
-| Layer      | Technology                                           |
-| ---------- | ---------------------------------------------------- |
-| Frontend   | React 18, TypeScript, Vite, Tailwind CSS             |
-| Backend    | Node.js, Express, TypeScript, tsx                    |
-| LLM        | DeepSeek (`deepseek-chat`) via OpenAI-compatible API |
-| Embeddings | Local ONNX model via `@xenova/transformers` (no API key) |
-| Vector DB  | pgvector (PostgreSQL) with in-memory fallback        |
-| Search     | Tavily Web Search API                                |
-| Streaming  | Server-Sent Events (SSE)                             |
+| Layer      | Technology                                               |
+| ---------- | -------------------------------------------------------- |
+| Frontend   | React 18, TypeScript, Vite, Tailwind CSS                 |
+| Backend    | Node.js, Express, TypeScript, tsx                        |
+| LLM        | DeepSeek (`deepseek-chat`) via OpenAI-compatible API     |
+| Embeddings | HuggingFace Inference API (`sentence-transformers/all-MiniLM-L6-v2`) |
+| Vector DB  | pgvector (PostgreSQL) with in-memory fallback            |
+| Search     | Tavily Web Search API                                    |
+| Streaming  | Server-Sent Events (SSE)                                 |
 
 ## Getting started
 
@@ -101,6 +101,7 @@ The query input shows 3 example prompts picked at random on each page load from 
 - Node.js 18+
 - A [DeepSeek API key](https://platform.deepseek.com/) — used for planning, research, synthesis, and evaluation
 - A [Tavily API key](https://tavily.com/)
+- A [HuggingFace token](https://huggingface.co/settings/tokens) — required for document upload and RAG (free account)
 - (Optional) A PostgreSQL database with the [pgvector extension](https://github.com/pgvector/pgvector) — for persistent document storage across restarts
 
 ### Installation
@@ -120,11 +121,12 @@ cp .env.example .env
 ```env
 DEEPSEEK_API_KEY=your-deepseek-api-key
 TAVILY_API_KEY=your-tavily-api-key
-PORT=3001
+HF_TOKEN=your-huggingface-token
 
 # Optional — enables persistent vector storage via pgvector.
 # Without this, an in-memory store is used (documents lost on restart).
 # DATABASE_URL=postgresql://user:password@localhost:5432/research_agent
+PORT=3001
 ```
 
 ### Running locally
@@ -170,7 +172,7 @@ research-agent/
         ├── lib/
         │   ├── db.ts           # pg Pool + initDb() — schema creation for pgvector
         │   ├── vectorStore.ts  # Dual-backend: pgvector (DATABASE_URL) or in-memory fallback
-        │   ├── embeddings.ts   # Local ONNX embeddings via @xenova/transformers
+        │   ├── embeddings.ts   # HuggingFace Inference API embeddings
         │   └── chunker.ts      # Document text chunking for ingestion
         └── tools/
             └── search.ts    # Tavily web search wrapper
@@ -195,7 +197,7 @@ Returns an SSE stream. Events:
 
 ### `GET /api/documents`
 
-Returns `{ available: boolean, documents: DocumentMeta[] }`. `available` is always `true` — embeddings run locally via `@xenova/transformers` and require no API key.
+Returns `{ available: boolean, documents: DocumentMeta[] }`. `available` is `true` when `HF_TOKEN` is set.
 
 ### `POST /api/documents/upload`
 
@@ -230,6 +232,7 @@ In Railway → your service → **Variables**:
 ```
 DEEPSEEK_API_KEY   = your-key-here
 TAVILY_API_KEY     = your-key-here
+HF_TOKEN           = your-key-here
 NODE_ENV           = production
 ```
 
